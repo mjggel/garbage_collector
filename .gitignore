@@ -1,0 +1,28 @@
+# ===== Build artifacts =====
+gc_project
+*.o
+*.a
+*.so
+
+# ===== Debug / profiling =====
+*.out
+*.log
+vgcore.*
+core
+core.*
+
+# ===== Editor / IDE =====
+.vscode/
+
+# ===== OS junk =====
+.DS_Store
+Thumbs.db
+
+# ===== Temporary files =====
+*~
+*.swp
+*.swo
+
+# ===== Test outputs =====
+tests/*.out
+tests/*.log
