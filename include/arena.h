@@ -23,6 +23,14 @@ typedef struct
 
 #define UNTAG_BLOCK(p) ((Block*)((uintptr_t)(p) & ~TAG_MASK))
 
+#define HAS_TAG(p, tag) (((uintptr_t)(p->next) & (tag)) != 0)
+
+#define REMOVE_TAG(p, tag) ((p->next) = (Block*)((uintptr_t)(p->next) & ~(tag)))
+
+#define GET_NEXT(p) (UNTAG_BLOCK((p)->next))
+
+#define ALIGN(p) ((p + TAG_MASK) & ~TAG_MASK)
+
 void gc_init(size_t size);
 
 #endif

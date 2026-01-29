@@ -35,3 +35,28 @@ void gc_init(size_t size) {
 
     printf("Arena initialized at %p with %zu bytes\n", ptr, size);
 }
+
+void* gc_alloc(size_t size) {
+
+    size = ALIGN(size);
+
+    Block* current = global_arena.free_list;
+
+    while(current != NULL) {
+
+        if(HAS_TAG(current, TAG_FREE)) {
+
+            if(current->size >= size) {
+
+                REMOVE_TAG(current, TAG_FREE);
+
+                return (void*) (current + 1);
+            }
+
+        }
+
+        current = GET_NEXT(current);
+    }
+
+    return NULL;
+}
