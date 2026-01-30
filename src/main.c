@@ -4,8 +4,8 @@
 int main() {
 
     gc_init(4096);
-    void* p1 = gc_alloc(64);
-    void* p2 = gc_alloc(128);
+    void* p1 = gc_alloc(32);
+    void* p2 = gc_alloc(32);
 
 
     printf("--- Day 0: Sanity Check ---\n");

@@ -46,6 +46,23 @@ void* gc_alloc(size_t size) {
 
         if(HAS_TAG(current, TAG_FREE)) {
 
+            size_t split = current->size - size;
+
+            if(split >= (sizeof(Block) + 8) ) {
+
+
+
+                uintptr_t current_addr = (uintptr_t)current;
+                
+                Block* next_block = (Block*)((uintptr_t)current_addr + sizeof(Block) + size);
+                
+                next_block->size = split - sizeof(Block);
+
+                current->size = size;
+                current->next = (Block*) ( (uintptr_t) next_block | TAG_FREE); 
+
+            }
+
             if(current->size >= size) {
 
                 REMOVE_TAG(current, TAG_FREE);

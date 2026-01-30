@@ -15,7 +15,7 @@ typedef struct
     size_t size;
     Block* free_list;
 } GC_Arena;
-
+    
 
 #define TAG_MARK 0x1
 #define TAG_FREE 0x2
