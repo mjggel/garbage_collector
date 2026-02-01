@@ -12,8 +12,10 @@ typedef struct Block {
 typedef struct
 {
     void* start;
+    void* stack_top;
     size_t size;
-    Block* free_list;
+    Block* list;
+    
 } GC_Arena;
     
 

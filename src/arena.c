@@ -2,9 +2,11 @@
 #include <stdio.h>
 #include "arena.h"
 
+#define MIN_WORTH_SIZE 8
+
 static GC_Arena global_arena;
 
-void gc_init(size_t size) {
+void gc_init(size_t size, void* stack_top) {
 
 
     void* ptr = mmap(
@@ -23,6 +25,8 @@ void gc_init(size_t size) {
 
     global_arena.start = ptr;
     global_arena.size = size;
+    global_arena.stack_top = stack_top;
+
 
     Block* first = (Block*)ptr;
 
@@ -31,7 +35,7 @@ void gc_init(size_t size) {
 
     first->next = (Block*)((uintptr_t) NULL | TAG_FREE);
 
-    global_arena.free_list = first;
+    global_arena.list = first;
 
     printf("Arena initialized at %p with %zu bytes\n", ptr, size);
 }
@@ -40,7 +44,7 @@ void* gc_alloc(size_t size) {
 
     size = ALIGN(size);
 
-    Block* current = global_arena.free_list;
+    Block* current = global_arena.list;
 
     while(current != NULL) {
 
@@ -48,7 +52,7 @@ void* gc_alloc(size_t size) {
 
             size_t split = current->size - size;
 
-            if(split >= (sizeof(Block) + 8) ) {
+            if(split >= (sizeof(Block) + MIN_WORTH_SIZE) ) {
 
 
 
@@ -59,6 +63,11 @@ void* gc_alloc(size_t size) {
                 next_block->size = split - sizeof(Block);
 
                 current->size = size;
+
+                Block* old_next = GET_NEXT(current);
+
+                next_block->next = (Block*) ( (uintptr_t) old_next | TAG_FREE);  
+
                 current->next = (Block*) ( (uintptr_t) next_block | TAG_FREE); 
 
             }
@@ -76,4 +85,22 @@ void* gc_alloc(size_t size) {
     }
 
     return NULL;
+}
+
+void* get_rsp() {
+    void * rsp;
+    asm("mov %%rsp, %0" : "=r"(rsp));
+    return rsp;
+
+}
+
+void gc_collect(){
+    uintptr_t* current_stack = (uintptr_t*)get_rsp();
+    uintptr_t* stack_top = (uintptr_t*) global_arena.stack_top;
+
+    while(current_stack < stack_top){
+        printf("stack value: 0x%lx", *current_stack);
+
+        current_stack++;
+    }
 }
