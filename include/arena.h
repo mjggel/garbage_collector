@@ -33,6 +33,10 @@ typedef struct
 
 #define ALIGN(p) ((p + TAG_MASK) & ~TAG_MASK)
 
-void gc_init(size_t size);
+void gc_collect();
+
+void gc_init(size_t size, void* stack_top);
+
+void* gc_alloc(size_t size);
 
 #endif
