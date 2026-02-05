@@ -116,34 +116,14 @@ void gc_mark(void* p) {
     ptr->next = (Block*) ((uintptr_t)ptr->next | TAG_MARK);
 }
 
-void gc_collect(){
-    jmp_buf env;
-    setjmp(env);
-
-    uintptr_t* current_stack = (uintptr_t*)get_rsp();
-    uintptr_t* stack_top = (uintptr_t*) global_arena.stack_top;
-
-    printf("\n--- GC START: Scanning Stack ---\n");
-    printf("Stack Bottom: %p | Stack Top: %p\n", current_stack, stack_top);
-
-    while(current_stack < stack_top){
-        if(is_pointer(*current_stack)) {
-            printf("[FOUND ROOT] Addr: %p | Value: 0x%lx (Points to Arena)\n", current_stack, *current_stack);
-            gc_mark((void*)*current_stack);
-        }
-        current_stack++;
-    }
-    
-    printf("--- GC END ---\n");
-}
-
 void gc_sweep(){
+
     Block* current = global_arena.list;
 
     while(current != NULL) {
     restart_scan:;
 
-        uintptr_t next_block = UNTAG_BLOCK(current->next);
+        Block* next_block = UNTAG_BLOCK(current->next);
 
         uintptr_t tags = (uintptr_t)current->next & TAG_MASK;
 
@@ -181,4 +161,46 @@ void gc_sweep(){
         current = GET_NEXT(current);
     }
     
+}
+
+void gc_collect(){
+    jmp_buf env;
+    setjmp(env);
+
+    uintptr_t* current_stack = (uintptr_t*)get_rsp();
+    uintptr_t* stack_top = (uintptr_t*) global_arena.stack_top;
+
+    printf("\n--- GC START: Scanning Stack ---\n");
+    printf("Stack Bottom: %p | Stack Top: %p\n", current_stack, stack_top);
+
+    while(current_stack < stack_top){
+        if(is_pointer(*current_stack)) {
+            printf("[FOUND ROOT] Addr: %p | Value: 0x%lx (Points to Arena)\n", current_stack, *current_stack);
+            gc_mark((void*)*current_stack);
+        }
+        current_stack++;
+    }
+    
+    gc_sweep();
+
+    printf("--- GC END ---\n");
+}
+
+void debug_heap() {
+    printf("\n--- HEAP LAYOUT ---\n");
+    Block* current = global_arena.list;
+    int i = 0;
+    while (current != NULL) {
+        uintptr_t next_addr = (uintptr_t)UNTAG_BLOCK(current->next);
+        uintptr_t tags = (uintptr_t)current->next & TAG_MASK;
+        
+        char* status = (tags & TAG_MARK) ? "[MARKED/LIVE]" : 
+                       (tags & TAG_FREE) ? "[FREE]" : "[USED/DEAD]";
+
+        printf("Block %d: %p | Size: %zu | Status: %s\n", 
+               i++, (void*)current, current->size, status);
+
+        current = (Block*)next_addr;
+    }
+    printf("-------------------\n");
 }
