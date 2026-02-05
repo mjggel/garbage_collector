@@ -136,3 +136,49 @@ void gc_collect(){
     
     printf("--- GC END ---\n");
 }
+
+void gc_sweep(){
+    Block* current = global_arena.list;
+
+    while(current != NULL) {
+    restart_scan:;
+
+        uintptr_t next_block = UNTAG_BLOCK(current->next);
+
+        uintptr_t tags = (uintptr_t)current->next & TAG_MASK;
+
+        //if was MARKED tags: 0x...001
+        //if was NOT MARKED AND NOT FREE tags: 0x...000 -- DEAD
+        //if was FREE tags: 0x...011 -- FREE
+
+        uintptr_t new_tags = (~tags & TAG_MARK) << 1;
+
+        //if was MARKED --> (0x...110 AND 0x...001) -> 0x...000 -- LIVE
+        //if was NOT MARKED AND NOT FREE --> (0x...111 AND 0x...001) -> 0x...010 -- FREE
+        //if was FREE --> (0x...101 AND 0x...001) -> 0x...010 -- FREE
+
+
+        current->next = (Block*) ((uintptr_t)next_block | new_tags);
+
+        if((new_tags & TAG_FREE) && next_block != NULL) {
+            
+            uintptr_t next_block_tag = (uintptr_t)next_block->next & TAG_MASK;
+
+
+            if(!(next_block_tag & TAG_MARK)) {
+            
+                current->size += sizeof(Block) + next_block->size;
+                
+                uintptr_t next_next_addr = (uintptr_t)next_block->next & ~TAG_MASK;
+
+                current->next = (Block*)(next_next_addr | new_tags);
+
+                goto restart_scan;
+            }
+        }
+
+        
+        current = GET_NEXT(current);
+    }
+    
+}
