@@ -1,12 +1,21 @@
 # ===== Build artifacts =====
-gc_project
 *.o
 *.a
 *.so
+*.out
+*.exe
+
+# ===== Binaries / executables =====
+a.out
+*.exe
+*.bin
+*.elf
+*.out
+gc_project
+bin/
+build/
 
 # ===== Debug / profiling =====
-*.out
-*.log
 vgcore.*
 core
 core.*
@@ -23,6 +32,6 @@ Thumbs.db
 *.swp
 *.swo
 
-# ===== Test outputs =====
-tests/*.out
-tests/*.log
+# ===== Tests =====
+tests/
+test_suite/

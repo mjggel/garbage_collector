@@ -32,9 +32,9 @@ void gc_init(size_t size, void* stack_top) {
     Block* first = (Block*)ptr;
 
 
-    first->size = size - sizeof(Block);
-
+    first->size = (uint32_t)(size - sizeof(Block));
     first->next = (Block*)((uintptr_t) NULL | TAG_FREE);
+    first->age = 0;
 
     global_arena.list = first;
 
@@ -61,9 +61,11 @@ void* gc_alloc(size_t size) {
                 
                 Block* next_block = (Block*)((uintptr_t)current_addr + sizeof(Block) + size);
                 
-                next_block->size = split - sizeof(Block);
+                next_block->size = (uint32_t)(split - sizeof(Block));
+                next_block->age = 0;
 
-                current->size = size;
+                current->size = (uint32_t)size;
+                current->age = 0;
 
                 Block* old_next = GET_NEXT(current);
 
@@ -76,7 +78,7 @@ void* gc_alloc(size_t size) {
             if(current->size >= size) {
 
                 REMOVE_TAG(current, TAG_FREE);
-
+                current->age = 0;
                 return (void*) (current + 1);
             }
 
@@ -127,16 +129,23 @@ void gc_sweep(){
 
         uintptr_t tags = (uintptr_t)current->next & TAG_MASK;
 
-        //if was MARKED tags: 0x...001
-        //if was NOT MARKED AND NOT FREE tags: 0x...000 -- DEAD
-        //if was FREE tags: 0x...011 -- FREE
+        //if was MARKED tags: [0x...001]
+        //if was NOT MARKED AND NOT FREE tags: [0x...000] -- DEAD
+        //if was FREE tags: [0x...011] -- FREE
 
         uintptr_t new_tags = (~tags & TAG_MARK) << 1;
 
-        //if was MARKED --> (0x...110 AND 0x...001) -> 0x...000 -- LIVE
-        //if was NOT MARKED AND NOT FREE --> (0x...111 AND 0x...001) -> 0x...010 -- FREE
-        //if was FREE --> (0x...101 AND 0x...001) -> 0x...010 -- FREE
+        //if was MARKED --> ((~[0x...001])->[0x...110] & [0x...001]) -> [0x...000] -- LIVE
+        //if was NOT MARKED AND NOT FREE --> ((~[0x...000])->[0x...111] & [0x...001]) -> [0x...001<<] -> [0x...010] -- FREE
+        //if was FREE --> ((~[0x...010])->[0x...101] & [0x...001]) -> [0x...001<<] -> [0x...010] -- FREE
 
+        uint32_t is_survivor = !(new_tags & TAG_FREE);
+
+        //since new_tags is eiter 0 or the TAG_FREE bit
+        //if is FREE --> is_survivor = 0 -> !([0x...010] & [0x...010] == ***1***)
+        //if is LIVE --> is_survivor = 1 -> !([0x...000] & [0x...010] == ***0***)
+
+        current->age = (current->age + is_survivor) * is_survivor;
 
         current->next = (Block*) ((uintptr_t)next_block | new_tags);
 
@@ -149,6 +158,8 @@ void gc_sweep(){
             
                 current->size += sizeof(Block) + next_block->size;
                 
+                current->age = 0;
+
                 uintptr_t next_next_addr = (uintptr_t)next_block->next & ~TAG_MASK;
 
                 current->next = (Block*)(next_next_addr | new_tags);
@@ -186,6 +197,16 @@ void gc_collect(){
     printf("--- GC END ---\n");
 }
 
+void gc_destroy() {
+    if (global_arena.start != NULL) {
+        munmap(global_arena.start, global_arena.size);
+        global_arena.start = NULL;
+        global_arena.list = NULL;
+        global_arena.size = 0;
+        printf("Arena destroyed and memory released.\n");
+    }
+}
+
 void debug_heap() {
     printf("\n--- HEAP LAYOUT ---\n");
     Block* current = global_arena.list;
@@ -197,7 +218,7 @@ void debug_heap() {
         char* status = (tags & TAG_MARK) ? "[MARKED/LIVE]" : 
                        (tags & TAG_FREE) ? "[FREE]" : "[USED/DEAD]";
 
-        printf("Block %d: %p | Size: %zu | Status: %s\n", 
+        printf("Block %d: %p | Size: %u | Status: %s\n", 
                i++, (void*)current, current->size, status);
 
         current = (Block*)next_addr;

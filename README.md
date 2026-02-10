@@ -1,12 +1,14 @@
 # Mark-and-Sweep Garbage Collector
 
 A **Conservative Garbage Collector** written in pure C from scratch.
-This project abandons standard abstractions (`malloc`, `free`) to interact directly with the OS Kernel, implementing raw memory management, pointer arithmetic, and stack scanning.
+This project abandons standard abstractions (`malloc`, `free`) to interact directly with the OS Kernel, implementing raw memory management, pointer arithmetic, object aging, and stack scanning.
 
 ## Features
 
-* **Zero Malloc:** Replaces the standard allocator with direct Kernel memory mapping via `mmap` (Anonymous/Private).
-* **Pointer Tagging:** Utilizes 64-bit memory alignment to store `MARKED` and `FREE` flags inside the pointer's unused bits (optimization).
+* **Zero Malloc:** Replaces the standard allocator with direct Kernel memory mapping via `mmap` (Anonymous/Private) and cleanup via `munmap`.
+* **Object Aging:** Tracks how many GC cycles an object has survived. This lays the foundation for Generational Garbage Collection (GenGC) by identifying long-lived objects.
+* **Struct Packing:** Optimized header layout using `uint32_t` bit-packing to store size and age metadata without breaking the critical 16-byte memory alignment.
+* **Pointer Tagging:** Utilizes 64-bit memory alignment to store `MARKED` and `FREE` flags inside the pointer's unused bits.
 * **Stack Scanning:** Implements inline x86_64 Assembly and `setjmp` exploits to flush CPU registers and scan the stack for root pointers.
 * **Coalescing:** Automatic merging of adjacent free blocks (defragmentation) during the sweep phase.
 * **Conservative Strategy:** Identifies roots without explicit type information, preventing crashes by assuming "looks like a pointer, is a pointer."
@@ -14,6 +16,16 @@ This project abandons standard abstractions (`malloc`, `free`) to interact direc
 ## Core Mechanics
 
 The system manages a raw memory **Arena** sliced into a linked list of **Blocks**.
+
+### Block Metadata (16 Bytes)
+To maintain alignment for pointer tagging while tracking object age, we use a compact header structure:
+```c
+typedef struct Block {
+    uint32_t size;      // Max block size: 4GB
+    uint32_t age;       // Survival counter
+    struct Block* next; // Tagged pointer
+} Block;
+```
 
 ### Pointer Tagging Strategy
 
@@ -25,13 +37,14 @@ Since `malloc` (and our allocator) aligns memory to 8 bytes on 64-bit systems, t
 | **1** | `TAG_FREE` | Object is available for reallocation. |
 | **2** | `UNUSED` | Available for future flags. |
 
+
 ### API
 
 The library provides a simple interface to manage the heap:
 
 * `gc_init(size_t size, void* stack_top)`: Initializes the Arena requesting pages from the OS.
 * `gc_alloc(size_t size)`: Allocates aligned memory (First-Fit strategy).
-* `gc_collect()`: Triggers the Mark-and-Sweep process (Stop-the-World).
+* `gc_collect()`: Triggers the Mark-and-Sweep process (Stop-the-World).* `gc_destroy()`: Unmaps the memory arena and returns resources to the OS.
 
 ## How to Build & Run
 
@@ -60,6 +73,8 @@ The project is split into the core engine and a stress-test suite designed to br
 
 ## Project Architecture:
 
+**build/:** Output directory for compiled binaries (`gc_project` and `test_suite`).
+
 **include/:** Header files (Struct definitions and Macros).
 
 **src/:** Core implementation (arena.c) and simulation (main.c).
@@ -85,7 +100,6 @@ The test_suite validates complex memory scenarios:
 * **Debugging**: GDB & Valgrind-ready
 
 ---
-
 **Educational purpose only.**
 
 Developed by **mjggel** — 2026.

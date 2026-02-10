@@ -44,5 +44,7 @@ int main() {
         session->id
     );
 
+    gc_destroy();
+
     return 0;
 }

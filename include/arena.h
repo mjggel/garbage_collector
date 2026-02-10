@@ -5,7 +5,8 @@
 #include <stdint.h>
 
 typedef struct Block {
-    size_t size;
+    uint32_t size;
+    uint32_t age;
     struct Block* next;
 } Block;
 
@@ -13,7 +14,7 @@ typedef struct
 {
     void* start;
     void* stack_top;
-    size_t size;
+    uint32_t size;
     Block* list;
     
 } GC_Arena;
@@ -38,6 +39,8 @@ void gc_collect();
 void gc_init(size_t size, void* stack_top);
 
 void* gc_alloc(size_t size);
+
+void gc_destroy();
 
 void debug_heap();
 

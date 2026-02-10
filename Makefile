@@ -1,16 +1,20 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -g3 -O0 -fno-stack-protector -Iinclude
 
-# Alvos
-all: gc_project test_suite
+BUILD_DIR = build
+BIN_GC = $(BUILD_DIR)/gc_project
+BIN_TEST = $(BUILD_DIR)/test_suite
 
-# Compila o executável principal
-gc_project: src/main.c src/arena.c
-	$(CC) $(CFLAGS) src/main.c src/arena.c -o gc_project
+all: $(BIN_GC) $(BIN_TEST)
 
-# Compila o executável de testes (Linka o teste com a arena)
-test_suite: tests/stress_test.c src/arena.c
-	$(CC) $(CFLAGS) tests/stress_test.c src/arena.c -o test_suite
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+$(BIN_GC): src/main.c src/arena.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) src/main.c src/arena.c -o $(BIN_GC)
+
+$(BIN_TEST): tests/stress_test.c src/arena.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) tests/stress_test.c src/arena.c -o $(BIN_TEST)
 
 clean:
-	rm -f gc_project test_suite
+	rm -rf $(BUILD_DIR)
