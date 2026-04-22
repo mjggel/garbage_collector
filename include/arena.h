@@ -10,12 +10,13 @@ typedef struct Block {
     struct Block* next;
 } Block;
 
-typedef struct
-{
+typedef struct GC_Arena {
     void* start;
     void* stack_top;
     uint32_t size;
     Block* list;
+    uint8_t* dirty_pages;
+    size_t num_pages; 
     
 } GC_Arena;
     
@@ -23,6 +24,7 @@ typedef struct
 #define TAG_MARK 0x1
 #define TAG_FREE 0x2
 #define TAG_MASK 0x7
+#define PAGE_SIZE 4096
 
 #define UNTAG_BLOCK(p) ((Block*)((uintptr_t)(p) & ~TAG_MASK))
 

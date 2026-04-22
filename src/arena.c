@@ -9,6 +9,7 @@ static GC_Arena global_arena;
 
 void gc_init(size_t size, void* stack_top) {
 
+    size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 
     void* ptr = mmap(
         NULL,
@@ -28,13 +29,26 @@ void gc_init(size_t size, void* stack_top) {
     global_arena.size = size;
     global_arena.stack_top = stack_top;
 
-
     Block* first = (Block*)ptr;
-
 
     first->size = (uint32_t)(size - sizeof(Block));
     first->next = (Block*)((uintptr_t) NULL | TAG_FREE);
     first->age = 0;
+
+    global_arena.num_pages = size / PAGE_SIZE;
+
+    global_arena.dirty_pages = (uint8_t*)mmap(
+        NULL,
+        global_arena.num_pages,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS,
+        -1,
+        0
+    );
+
+    for(size_t i = 0; i < global_arena.num_pages; i++) {
+        global_arena.dirty_pages[i] = 0;
+    }
 
     global_arena.list = first;
 
@@ -212,6 +226,11 @@ void gc_collect(){
 
 void gc_destroy() {
     if (global_arena.start != NULL) {
+        if(global_arena.dirty_pages != NULL) {
+            munmap(global_arena.dirty_pages, global_arena.num_pages);
+            global_arena.dirty_pages = NULL;
+        }
+        
         munmap(global_arena.start, global_arena.size);
         global_arena.start = NULL;
         global_arena.list = NULL;
