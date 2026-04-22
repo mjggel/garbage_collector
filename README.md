@@ -6,11 +6,20 @@ This project abandons standard abstractions (`malloc`, `free`) to interact direc
 ## Features
 
 * **Zero Malloc:** Replaces the standard allocator with direct Kernel memory mapping via `mmap` (Anonymous/Private) and cleanup via `munmap`.
-* **Object Aging:** Tracks how many GC cycles an object has survived. This lays the foundation for Generational Garbage Collection (GenGC) by identifying long-lived objects.
+
+* **Virtual Memory Page Tracking:** Implements a Write Barrier by utilizing the OS Virtual Memory Unit (VMU). The collector protects memory pages with mprotect and intercepts modifications.
+
+* **Hardware-Level Write Barrier:** Seizes SIGSEGV signals via sigaction to detect when the application attempts to modify "Old Generation" objects, enabling efficient incremental scanning.
+
+* **Object Aging & Generational Logic:** Tracks object survival through GC cycles using an optimized 16-byte aligned header.
 * **Struct Packing:** Optimized header layout using `uint32_t` bit-packing to store size and age metadata without breaking the critical 16-byte memory alignment.
+
 * **Pointer Tagging:** Utilizes 64-bit memory alignment to store `MARKED` and `FREE` flags inside the pointer's unused bits.
+
 * **Stack Scanning:** Implements inline x86_64 Assembly and `setjmp` exploits to flush CPU registers and scan the stack for root pointers.
+
 * **Coalescing:** Automatic merging of adjacent free blocks (defragmentation) during the sweep phase.
+
 * **Conservative Strategy:** Identifies roots without explicit type information, preventing crashes by assuming "looks like a pointer, is a pointer."
 
 ## Core Mechanics
@@ -101,5 +110,7 @@ The test_suite validates complex memory scenarios:
 
 ---
 **Educational purpose only.**
+---
+**Disclaimer:** This project is for educational purposes in low-level systems programming and OS internals—and it almost drove me completely insane.
 
 Developed by **mjggel** — 2026.
