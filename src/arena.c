@@ -91,7 +91,7 @@ void* gc_alloc(size_t size) {
 }
 
 void* get_rsp() {
-    void * rsp;
+    void* rsp;
     asm("mov %%rsp, %0" : "=r"(rsp));
     return rsp;
 
@@ -114,9 +114,22 @@ void gc_mark(void* p) {
     if(HAS_TAG(ptr, TAG_MARK)){
         return;
     }
-    printf("Marking block at %p\n", ptr);
+
     ptr->next = (Block*) ((uintptr_t)ptr->next | TAG_MARK);
-}
+
+    printf("Marking block at %p (Age: %u)\n", ptr, ptr->age);
+
+    uintptr_t* start = (uintptr_t*)p;
+    uintptr_t* end = (uintptr_t*)((char*)p + ptr->size);
+
+    for(uintptr_t* current = start; current < end; current++) {
+        if(is_pointer(*current)) {
+            printf("  [MARKING CHILD] Addr: %p | Value: 0x%lx (Points to Arena)\n", current, *current);
+            gc_mark((void*)*current);
+        }
+    }
+    
+}   
 
 void gc_sweep(){
 
