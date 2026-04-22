@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -g3 -O0 -fno-stack-protector -Iinclude
+CFLAGS = -Wall -Wextra -g3 -Og -fno-stack-protector -Iinclude
 
 BUILD_DIR = build
 BIN_GC = $(BUILD_DIR)/gc_project
