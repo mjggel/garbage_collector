@@ -249,17 +249,40 @@ void gc_collect(){
     uintptr_t* stack_top = (uintptr_t*) global_arena.stack_top;
 
     printf("\n--- GC START: Scanning Stack ---\n");
-    printf("Stack Bottom: %p | Stack Top: %p\n", current_stack, stack_top);
+
+    for(size_t i = 0; i < global_arena.num_pages; i++) {
+        void* page_start = (char*)global_arena.start + (i * PAGE_SIZE);
+        mprotect(page_start, PAGE_SIZE, PROT_READ | PROT_WRITE);
+    }
 
     while(current_stack < stack_top){
         if(is_pointer(*current_stack)) {
-            printf("[FOUND ROOT] Addr: %p | Value: 0x%lx (Points to Arena)\n", current_stack, *current_stack);
             gc_mark((void*)*current_stack);
         }
         current_stack++;
     }
-    
+
+    for(size_t i = 0; i < global_arena.num_pages; i++) {
+        if(global_arena.dirty_pages[i]) {
+            uintptr_t* page_start = (uintptr_t*)((char*)global_arena.start + (i * PAGE_SIZE));
+            uintptr_t* page_end = (uintptr_t*)((char*)page_start + PAGE_SIZE);
+
+            for(uintptr_t* ptr = page_start; ptr < page_end; ptr++) {
+                if(is_pointer(*ptr)) {
+                    gc_mark((void*)*ptr);
+                }
+            }
+        }
+    }
+
     gc_sweep();
+
+    for(size_t i = 0; i < global_arena.num_pages; i++) {
+        global_arena.dirty_pages[i] = 0;
+        
+        void* page_start = (char*)global_arena.start + (i * PAGE_SIZE);
+        mprotect(page_start, PAGE_SIZE, PROT_READ);
+    }
 
     printf("--- GC END ---\n");
 }
