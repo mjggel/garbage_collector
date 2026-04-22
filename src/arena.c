@@ -2,10 +2,38 @@
 #include <setjmp.h>
 #include <stdio.h>
 #include "arena.h"
+#include <signal.h>
 
 #define MIN_WORTH_SIZE 8
 
 static GC_Arena global_arena;
+
+void segv_handler(int sig, siginfo_t *si, void *unused) {
+
+    (void)sig;
+    (void)unused;
+    
+    uintptr_t fault_addr = (uintptr_t)si->si_addr;
+    uintptr_t start = (uintptr_t)global_arena.start;
+    uintptr_t end = start + global_arena.size;
+
+    if (fault_addr >= start && fault_addr < end) {
+        
+        size_t page_idx = (fault_addr - start) / PAGE_SIZE;
+        
+        global_arena.dirty_pages[page_idx] = 1;
+
+        void* page_start = (void*)(start + (page_idx * PAGE_SIZE));
+        mprotect(page_start, PAGE_SIZE, PROT_READ | PROT_WRITE);
+        
+        
+        printf("  [Write Barrier] Acesso detectado na página %zu! Liberando acesso...\n", page_idx);
+        
+    } else {
+        fprintf(stderr, "\n[FATAL] Segmentation Fault real no endereço: %p\n", (void*)fault_addr);
+        signal(SIGSEGV, SIG_DFL); 
+    }
+}
 
 void gc_init(size_t size, void* stack_top) {
 
@@ -29,11 +57,7 @@ void gc_init(size_t size, void* stack_top) {
     global_arena.size = size;
     global_arena.stack_top = stack_top;
 
-    Block* first = (Block*)ptr;
-
-    first->size = (uint32_t)(size - sizeof(Block));
-    first->next = (Block*)((uintptr_t) NULL | TAG_FREE);
-    first->age = 0;
+   
 
     global_arena.num_pages = size / PAGE_SIZE;
 
@@ -49,6 +73,22 @@ void gc_init(size_t size, void* stack_top) {
     for(size_t i = 0; i < global_arena.num_pages; i++) {
         global_arena.dirty_pages[i] = 0;
     }
+
+    struct sigaction sa;
+    sa.sa_flags = SA_SIGINFO;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_sigaction = segv_handler;
+    
+    if (sigaction(SIGSEGV, &sa, NULL) == -1) {
+        perror("Error installing signal handler");
+    }
+    
+
+    Block* first = (Block*)ptr;
+
+    first->size = (uint32_t)(size - sizeof(Block));
+    first->next = (Block*)((uintptr_t) NULL | TAG_FREE);
+    first->age = 0;
 
     global_arena.list = first;
 
